@@ -3,22 +3,22 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/hooks/useAuth";
-import { ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { ShieldCheck } from "lucide-react";
+import { useAuth } from "@/lib/hooks/useAuth";
 import Link from "next/link";
 
-export default function LoginPage() {
-  const { login } = useAuth();
-  const [email, setEmail] = useState("user@demo.com");
-  const [password, setPassword] = useState("user123");
+export default function RegisterPage() {
+  const { register } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login({ email, password });
+      await register({ email, password });
     } finally {
       setLoading(false);
     }
@@ -31,8 +31,8 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl text-white mb-2">
             <ShieldCheck size={28} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Sign in to your account</h1>
-          <p className="text-gray-500">Enter your credentials to access the security dashboard</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Create your account</h1>
+          <p className="text-gray-500">Sign up to start using the security dashboard</p>
         </div>
 
         <Card className="shadow-lg border-gray-200">
@@ -56,31 +56,15 @@ export default function LoginPage() {
             />
 
             <Button type="submit" className="w-full" isLoading={loading}>
-              Sign In
+              Create account
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
-            <div className="flex items-center justify-between text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-              <span className="font-medium text-gray-600">Demo credentials</span>
-              <span className="text-[11px] text-gray-400">For quick testing only</span>
-            </div>
-
-            <div className="space-y-1 text-xs font-mono text-gray-600">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-semibold text-gray-800">Admin</span>
-                <span>admin@demo.com / admin123</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-semibold text-gray-800">User</span>
-                <span>user@demo.com / user123</span>
-              </div>
-            </div>
-
-            <p className="text-sm text-gray-500 text-center">
-              Don&apos;t have an account?{" "}
-              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                Create one
+          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+            <p className="text-sm text-gray-500">
+              Already have an account?{" "}
+              <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+                Sign in
               </Link>
             </p>
           </div>

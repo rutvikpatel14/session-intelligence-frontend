@@ -7,8 +7,9 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Shield, AlertTriangle, Clock, ArrowUpRight, Smartphone, Monitor, Globe } from "lucide-react";
-import { formatDateDDMMYYYY } from "@/lib/utils";
+import { formatDateDDMMYYYY, getApiErrorMessage } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import toast from "react-hot-toast";
 
 interface DashboardStats {
   totalSessions: number;
@@ -56,8 +57,9 @@ export default function DashboardPage() {
           suspiciousSessions: list.filter((s) => s.isSuspicious).length,
           lastLoginAt,
         });
-      } catch {
+      } catch (error) {
         if (!cancelled) {
+          toast.error(getApiErrorMessage(error, "Failed to load dashboard data"));
           setStats({ totalSessions: 0, suspiciousSessions: 0, lastLoginAt: null });
         }
       }

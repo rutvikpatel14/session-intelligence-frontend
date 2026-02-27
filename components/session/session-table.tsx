@@ -2,7 +2,7 @@ import { Smartphone, Monitor, Globe } from "lucide-react";
 import { Table, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateDDMMYYYY } from "@/lib/utils";
+import { formatDateTimeDDMMYYYY } from "@/lib/utils";
 
 export interface SessionRow {
   id: string;
@@ -13,6 +13,7 @@ export interface SessionRow {
   isSuspicious: boolean;
   createdAt: string;
   lastUsedAt: string;
+  userRole?: "admin" | "user";
 }
 
 interface Props {
@@ -20,9 +21,11 @@ interface Props {
   onLogoutOne?: (id: string) => void;
   showVerify?: boolean;
   onVerify?: (id: string) => void;
+  canLogout?: boolean;
+  showRole?: boolean;
 }
 
-export function SessionTable({ sessions, onLogoutOne, showVerify, onVerify }: Props) {
+export function SessionTable({ sessions, onLogoutOne, showVerify, onVerify, canLogout, showRole }: Props) {
   const getDeviceType = (s: SessionRow) => {
     const needle = `${s.deviceName} ${s.userAgent}`.toLowerCase();
     if (needle.includes("iphone") || needle.includes("android") || needle.includes("ios")) return "mobile";
@@ -31,9 +34,22 @@ export function SessionTable({ sessions, onLogoutOne, showVerify, onVerify }: Pr
     return "desktop";
   };
 
+  const hasVerifyAction = Boolean(showVerify && onVerify && sessions.some((s) => s.isSuspicious));
+  const hasLogoutAction = Boolean(canLogout && onLogoutOne);
+  const showActions = hasVerifyAction || hasLogoutAction;
+
   return (
     <Table
-      headers={["Device", "IP Address", "Country", "Created At", "Last Used", "Status", "Action"]}
+      headers={[
+        "Device",
+        "IP Address",
+        "Country",
+        "Created At",
+        "Last Used",
+        "Status",
+        ...(showRole ? ["Role"] : []),
+        ...(showActions ? ["Action"] : []),
+      ]}
       className="w-full"
     >
       {sessions.map((s) => {
@@ -53,11 +69,11 @@ export function SessionTable({ sessions, onLogoutOne, showVerify, onVerify }: Pr
             <TableCell className="font-mono text-xs">{s.ipAddress}</TableCell>
             <TableCell>{s.country}</TableCell>
             <TableCell className="text-gray-500">
-              {formatDateDDMMYYYY(s.createdAt)}
+              {formatDateTimeDDMMYYYY(s.createdAt)}
             </TableCell>
             <TableCell>
               {s.lastUsedAt ? (
-                <span className="text-gray-700">{formatDateDDMMYYYY(s.lastUsedAt)}</span>
+                <span className="text-gray-700">{formatDateTimeDDMMYYYY(s.lastUsedAt)}</span>
               ) : (
                 <span className="text-gray-500">—</span>
               )}
@@ -67,20 +83,29 @@ export function SessionTable({ sessions, onLogoutOne, showVerify, onVerify }: Pr
                 {s.isSuspicious ? "Suspicious" : "Active"}
               </Badge>
             </TableCell>
-            <TableCell>
-              <div className="flex items-center justify-end gap-2">
-                {showVerify && s.isSuspicious && onVerify && (
-                  <Button variant="outline" size="sm" onClick={() => onVerify(s.id)}>
-                    Verify
-                  </Button>
-                )}
-                {onLogoutOne && (
-                  <Button variant="danger" size="sm" onClick={() => onLogoutOne(s.id)}>
-                    Logout
-                  </Button>
-                )}
-              </div>
-            </TableCell>
+            {showRole && (
+              <TableCell>
+                <Badge variant={s.userRole === "admin" ? "admin" : "user"}>
+                  {s.userRole === "admin" ? "Admin" : "User"}
+                </Badge>
+              </TableCell>
+            )}
+            {showActions && (
+              <TableCell>
+                <div className="flex items-center justify-end gap-2">
+                  {showVerify && s.isSuspicious && onVerify && (
+                    <Button variant="outline" size="sm" onClick={() => onVerify(s.id)}>
+                      Verify
+                    </Button>
+                  )}
+                  {onLogoutOne && canLogout && (
+                    <Button variant="danger" size="sm" onClick={() => onLogoutOne(s.id)}>
+                      Logout
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            )}
           </TableRow>
         );
       })}

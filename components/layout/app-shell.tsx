@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { getApiErrorMessage } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { loading, requiresVerification, suspiciousSessionId, markVerified } = useAuth();
@@ -24,8 +25,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       markVerified();
       toast.success("Session verified");
       router.refresh();
-    } catch {
-      toast.error("Verification failed");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Verification failed"));
     } finally {
       setVerifying(false);
     }

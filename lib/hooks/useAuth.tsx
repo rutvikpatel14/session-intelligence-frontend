@@ -14,6 +14,7 @@ interface AuthContextValue {
   requiresVerification: boolean;
   suspiciousSessionId: string | null;
   login: (params: { email: string; password: string; deviceName?: string }) => Promise<void>;
+  register: (params: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   markVerified: () => void;
 }
@@ -27,6 +28,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [suspiciousSessionId, setSuspiciousSessionId] = useState<string | null>(null);
   const router = useRouter();
 
+  function applyRefreshPayload(response: { data: unknown }) {
+    const data = response.data as {
+      user: AuthUser;
+      accessToken: string;
+      csrfToken: string;
+      session?: { id: string; isSuspicious: boolean };
+    };
+
+    setUser(data.user);
+    setAccessToken(data.accessToken);
+    setCsrfToken(data.csrfToken);
+
+    if (data.session?.isSuspicious) {
+      setRequiresVerification(true);
+      setSuspiciousSessionId(data.session.id);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -35,22 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const response = await authClient.post("/auth/refresh", {});
         if (cancelled) return;
-
-        const data = response.data as {
-          user: AuthUser;
-          accessToken: string;
-          csrfToken: string;
-          session?: { id: string; isSuspicious: boolean };
-        };
-
-        setUser(data.user);
-        setAccessToken(data.accessToken);
-        setCsrfToken(data.csrfToken);
-
-        if (data.session?.isSuspicious) {
-          setRequiresVerification(true);
-          setSuspiciousSessionId(data.session.id);
-        }
+        applyRefreshPayload(response);
       } catch {
         if (!cancelled) {
           clearAuthState();
@@ -74,6 +78,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Background session check so that admin-forced logouts
+  // take effect without the user manually refreshing.
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const response = await authClient.post("/auth/refresh", {});
+        if (cancelled) return;
+        applyRefreshPayload(response);
+      } catch {
+        if (cancelled) return;
+        clearAuthState();
+        setUser(null);
+        setRequiresVerification(false);
+        setSuspiciousSessionId(null);
+        router.push("/login");
+      }
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [user, router]);
+
   const login = async ({ email, password, deviceName }: { email: string; password: string; deviceName?: string }) => {
     try {
       let publicIp: string | undefined;
@@ -86,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch {
-        // ignore, will fall back to server-side IP detection
+        // ignore, will fall back to server-side IP detection on backend
       }
 
       const response = await authClient.post("/auth/login", {
@@ -113,9 +144,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.success("Logged in successfully");
       router.push("/dashboard");
     } catch (error) {
-      const anyError = error as { response?: { data?: { error?: { message?: string } } } };
-      const message = anyError.response?.data?.error?.message ?? "Unable to login";
-      toast.error(message);
+      const { getApiErrorMessage } = await import("@/lib/utils");
+      toast.error(getApiErrorMessage(error, "Unable to login"));
+      throw error;
+    }
+  };
+
+  const register = async ({ email, password }: { email: string; password: string }) => {
+    try {
+      await authClient.post("/auth/register", { email, password });
+      toast.success("Account created. Please sign in.");
+      router.push("/login");
+    } catch (error) {
+      const { getApiErrorMessage } = await import("@/lib/utils");
+      toast.error(getApiErrorMessage(error, "Unable to register"));
       throw error;
     }
   };
@@ -145,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requiresVerification,
     suspiciousSessionId,
     login,
+    register,
     logout,
     markVerified,
   };

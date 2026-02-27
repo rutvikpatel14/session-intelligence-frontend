@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Search, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { formatDateDDMMYYYY } from "@/lib/utils";
+import { formatDateTimeDDMMYYYY, getApiErrorMessage } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface AdminSessionRow {
@@ -40,6 +40,18 @@ export default function AdminPage() {
     void reload();
   }, [user?.role]);
 
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+
+    const interval = window.setInterval(() => {
+      void reload();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [user?.role]);
+
   async function reload() {
     if (user?.role !== "admin") {
       setLoading(false);
@@ -50,8 +62,8 @@ export default function AdminPage() {
     try {
       const res = await api.get("/admin/sessions");
       setSessions(res.data.sessions ?? []);
-    } catch {
-      toast.error("Failed to load sessions");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load sessions"));
     } finally {
       setLoading(false);
       setReloading(false);
@@ -60,11 +72,11 @@ export default function AdminPage() {
 
   const handleForceLogout = async (id: string) => {
     try {
-      await api.delete(`/admin/sessions/${id}`);
+      await api.delete(`/sessions/${id}`);
       toast.success("Session terminated");
       setSessions((prev) => prev.filter((s) => s.id !== id));
-    } catch {
-      toast.error("Failed to terminate session");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to terminate session"));
     }
   };
 
@@ -84,11 +96,11 @@ export default function AdminPage() {
     if (filtered.length === 0) return;
     setForcing(true);
     try {
-      await Promise.all(filtered.map((s) => api.delete(`/admin/sessions/${s.id}`)));
+      await Promise.all(filtered.map((s) => api.delete(`/sessions/${s.id}`)));
       toast.success("Forced logout executed");
       setSessions((prev) => prev.filter((s) => !filtered.some((f) => f.id === s.id)));
-    } catch {
-      toast.error("Failed to force logout sessions");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to force logout sessions"));
     } finally {
       setForcing(false);
     }
@@ -126,9 +138,9 @@ export default function AdminPage() {
             <Button variant="secondary" size="sm" isLoading={reloading} onClick={reload}>
               Refresh
             </Button>
-            <Button variant="danger" className="gap-2" isLoading={forcing} onClick={handleForceLogoutFiltered}>
+            <Button variant="danger" size="sm" className="gap-2" isLoading={forcing} onClick={handleForceLogoutFiltered}>
               <UserX size={16} />
-              Force Logout
+              Logout selected
             </Button>
           </div>
         </div>
@@ -167,7 +179,19 @@ export default function AdminPage() {
             <div className="flex h-32 items-center justify-center text-sm text-gray-500">No sessions found.</div>
           ) : (
             <>
-              <Table headers={["User Email", "Role", "Device", "IP Address", "Country", "Created", "Last Used", "Risk Status", ""]}>
+              <Table
+                headers={[
+                  "User Email",
+                  "Role",
+                  "Device",
+                  "IP Address",
+                  "Country",
+                  "Created",
+                  "Last Used",
+                  "Risk Status",
+                  "Actions",
+                ]}
+              >
                 {filtered.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell>
@@ -186,8 +210,10 @@ export default function AdminPage() {
                     <TableCell className="text-gray-500">{s.deviceName}</TableCell>
                     <TableCell className="font-mono text-xs">{s.ipAddress}</TableCell>
                     <TableCell>{s.country}</TableCell>
-                    <TableCell className="text-gray-500">{formatDateDDMMYYYY(s.createdAt)}</TableCell>
-                    <TableCell className="text-gray-500">{formatDateDDMMYYYY(s.lastUsedAt || s.createdAt)}</TableCell>
+                    <TableCell className="text-gray-500">{formatDateTimeDDMMYYYY(s.createdAt)}</TableCell>
+                    <TableCell className="text-gray-500">
+                      {s.lastUsedAt ? formatDateTimeDDMMYYYY(s.lastUsedAt) : "—"}
+                    </TableCell>
                     <TableCell>
                       {s.isSuspicious ? (
                         <div className="flex items-center gap-1.5 text-amber-600 font-medium">
@@ -202,8 +228,8 @@ export default function AdminPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => handleForceLogout(s.id)}>
-                        Force logout
+                      <Button variant="danger" size="sm" onClick={() => handleForceLogout(s.id)}>
+                        Logout
                       </Button>
                     </TableCell>
                   </TableRow>

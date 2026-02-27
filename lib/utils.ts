@@ -45,3 +45,13 @@ export function detectDeviceName() {
   return `${browser} on ${os}`;
 }
 
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  const anyError = error as { response?: { data?: { error?: { message?: string } } } };
+  const message = anyError?.response?.data?.error?.message;
+  if (typeof message === "string" && message.trim().length > 0) {
+    return message;
+  }
+  return fallback;
+}
+
+

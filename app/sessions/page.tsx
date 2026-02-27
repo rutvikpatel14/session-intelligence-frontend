@@ -10,19 +10,26 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { Modal } from "@/components/ui/modal";
 import { ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getApiErrorMessage } from "@/lib/utils";
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingAll, setLoadingAll] = useState(false);
   const [isLogoutAllModalOpen, setIsLogoutAllModalOpen] = useState(false);
-  const { suspiciousSessionId, markVerified } = useAuth();
+  const [sessionToRemove, setSessionToRemove] = useState<string | null>(null);
+  const [removingOne, setRemovingOne] = useState(false);
+  const { user, suspiciousSessionId, markVerified } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/sessions");
-      const items = (res.data.sessions ?? []) as Array<SessionRow>;
+      const endpoint = isAdmin ? "/admin/sessions" : "/sessions";
+      const res = await api.get(endpoint);
+      const items = (res.data.sessions ?? []) as Array<
+        SessionRow & { user?: { role?: "admin" | "user" } }
+      >;
       setSessions(
         items.map((s) => ({
           id: s.id,
@@ -33,10 +40,11 @@ export default function SessionsPage() {
           isSuspicious: s.isSuspicious,
           createdAt: s.createdAt,
           lastUsedAt: s.lastUsedAt,
+          userRole: (s as any).user?.role,
         }))
       );
-    } catch {
-      toast.error("Failed to load sessions");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load sessions"));
     } finally {
       setLoading(false);
     }
@@ -44,18 +52,32 @@ export default function SessionsPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void load();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isAdmin, load]);
 
   const handleLogoutOne = async (id: string) => {
     try {
+      setRemovingOne(true);
       await api.delete(`/sessions/${id}`);
       toast.success("Session logged out");
       if (suspiciousSessionId === id) {
         markVerified();
       }
       void load();
-    } catch {
-      toast.error("Failed to logout session");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to logout session"));
+    } finally {
+      setRemovingOne(false);
+      setSessionToRemove(null);
     }
   };
 
@@ -66,8 +88,8 @@ export default function SessionsPage() {
       toast.success("All sessions logged out");
       markVerified();
       void load();
-    } catch {
-      toast.error("Failed to logout all sessions");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to logout all sessions"));
     } finally {
       setLoadingAll(false);
       setIsLogoutAllModalOpen(false);
@@ -80,8 +102,8 @@ export default function SessionsPage() {
       toast.success("Session verified");
       markVerified();
       void load();
-    } catch {
-      toast.error("Failed to verify session");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to verify session"));
     }
   };
 
@@ -93,9 +115,11 @@ export default function SessionsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Active Sessions</h1>
             <p className="text-gray-500">Manage and monitor all devices currently signed into your account.</p>
           </div>
-          <Button variant="danger" onClick={() => setIsLogoutAllModalOpen(true)}>
-            Logout All Devices
-          </Button>
+          {isAdmin && (
+            <Button variant="danger" onClick={() => setIsLogoutAllModalOpen(true)}>
+              Logout All Devices
+            </Button>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -133,7 +157,14 @@ export default function SessionsPage() {
               No active sessions.
             </div>
           ) : (
-            <SessionTable sessions={sessions} onLogoutOne={handleLogoutOne} showVerify onVerify={handleVerify} />
+            <SessionTable
+              sessions={sessions}
+            onLogoutOne={(id) => setSessionToRemove(id)}
+              showVerify
+              onVerify={handleVerify}
+            canLogout={isAdmin}
+            showRole={isAdmin}
+            />
           )}
         </div>
       </div>
@@ -158,6 +189,34 @@ export default function SessionsPage() {
           <ShieldAlert className="text-red-500 shrink-0" size={24} />
           <p className="text-sm text-red-700">
             You will need to sign back in on all devices. This action cannot be undone.
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={sessionToRemove !== null}
+        onClose={() => (!removingOne ? setSessionToRemove(null) : undefined)}
+        title="Remove this session?"
+        description="Are you sure you want to remove this session? The user will be logged out from that device."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setSessionToRemove(null)} disabled={removingOne}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              isLoading={removingOne}
+              onClick={() => sessionToRemove && void handleLogoutOne(sessionToRemove)}
+            >
+              Remove
+            </Button>
+          </>
+        }
+      >
+        <div className="flex items-center gap-4 p-4 bg-red-50 rounded-lg border border-red-100">
+          <ShieldAlert className="text-red-500 shrink-0" size={24} />
+          <p className="text-sm text-red-700">
+            This will immediately terminate the selected session. The user will need to sign in again on that device.
           </p>
         </div>
       </Modal>

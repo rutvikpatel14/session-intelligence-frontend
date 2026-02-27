@@ -24,6 +24,15 @@ const authClient: AxiosInstance = axios.create({
   withCredentials: true,
 });
 
+authClient.interceptors.request.use((config) => {
+  const csrf = getCsrfToken() ?? Cookies.get("csrfToken");
+  if (csrf && config.method && ["post", "put", "patch", "delete"].includes(config.method)) {
+    config.headers = new AxiosHeaders(config.headers ?? {});
+    (config.headers as AxiosHeaders).set("x-csrf-token", csrf);
+  }
+  return config;
+});
+
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
 
@@ -51,18 +60,7 @@ async function refreshAccessToken() {
   isRefreshing = true;
 
   try {
-    const csrf = getCsrfToken() ?? Cookies.get("csrfToken");
-    const response = await authClient.post(
-      "/auth/refresh",
-      {},
-      {
-        headers: csrf
-          ? {
-              "x-csrf-token": csrf,
-            }
-          : undefined,
-      }
-    );
+    const response = await authClient.post("/auth/refresh", {});
 
     const { accessToken, csrfToken } = response.data as {
       accessToken: string;
