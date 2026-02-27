@@ -25,6 +25,11 @@ const authClient: AxiosInstance = axios.create({
 });
 
 authClient.interceptors.request.use((config) => {
+  // Skip CSRF for refresh endpoint
+  if (config.url === "/auth/refresh") {
+    return config;
+  }
+  
   const csrf = getCsrfToken() ?? Cookies.get("csrfToken");
   if (csrf && config.method && ["post", "put", "patch", "delete"].includes(config.method)) {
     config.headers = new AxiosHeaders(config.headers ?? {});
@@ -32,6 +37,7 @@ authClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
 
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
