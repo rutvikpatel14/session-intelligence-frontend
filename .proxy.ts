@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED_PATHS = ["/dashboard", "/sessions", "/admin"];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {  // Changed from middleware to proxy
   const { pathname } = req.nextUrl;
   const refreshToken = req.cookies.get("refreshToken");
 
@@ -21,4 +21,3 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/dashboard/:path*", "/sessions/:path*", "/admin/:path*", "/login"],
 };
-
